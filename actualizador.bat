@@ -1,61 +1,77 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: 1. Soporte para rutas de red (UNC)
+:: 1. Entrar en la carpeta del script (soporta rutas de red UNC)
 pushd "%~dp0"
 
-:: CONFIGURACION
-set "EXE_NAME=GS1_BARTENDER.exe"
+:: --- CONFIGURACION ---
+set "EXE_NAME=GS1-BARTENDER.exe"
 set "URL_VERSION=https://raw.githubusercontent.com/prdatos1/boletasalidacliente/main/version.txt"
-set "URL_EXE=https://raw.githubusercontent.com/prdatos1/boletasalidacliente/main/GS1_BARTENDER.exe"
+set "URL_EXE=https://raw.githubusercontent.com/prdatos1/boletasalidacliente/main/GS1-BARTENDER.exe"
 
-title Buscando actualizaciones...
+title Buscador de Actualizaciones GS1
 
-:: 2. Descargar version remota
+echo Comprobando version en GitHub...
 curl -s -L %URL_VERSION% -o version_remota.txt
 
-:: 3. Verificar si existe version.txt local, si no, crear uno basico
+:: Si no existe version.txt local, creamos uno base
 if not exist version.txt echo 0.0.0 > version.txt
 
-:: 4. Leer versiones
 set /p LOCAL_V=<version.txt
 set /p REMOTE_V=<version_remota.txt
 
-:: Limpiar posibles espacios
+:: Limpiar espacios
 set LOCAL_V=%LOCAL_V: =%
 set REMOTE_V=%REMOTE_V: =%
 
 echo Version Local: [%LOCAL_V%]
-echo Version Remota: [%REMOTE_V%]
+echo Version GitHub: [%REMOTE_V%]
 
-:: 5. Comparar versiones
 if "%LOCAL_V%"=="%REMOTE_V%" (
-    echo El programa ya esta actualizado.
+    echo Programa actualizado. Iniciando...
+    timeout /t 1 > nul
     del version_remota.txt
     start "" "%EXE_NAME%" /noupdate
     popd
     exit
 )
 
-:: 6. Actualizar si son distintas
-echo Nueva version detectada. Actualizando...
-timeout /t 2 /nobreak > nul
-
-:: Matar el proceso si sigue abierto
+echo.
+echo ! NUEVA VERSION DETECTADA !
+echo.
 taskkill /f /im "%EXE_NAME%" > nul 2>&1
 
-echo Descargando GS1_BARTENDER.exe...
-curl -L %URL_EXE% -o "%EXE_NAME%.new"
-echo Descargando version.txt...
-curl -s -L %URL_VERSION% -o version.txt
+echo Abriendo asistente de descarga...
+:: Descarga con barra de progreso grafica de Windows (PowerShell)
+powershell -Command "& { ^
+    $url = '%URL_EXE%'; ^
+    $dest = '%EXE_NAME%.new'; ^
+    Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Descargando nuevo ejecutable...' -PercentComplete 0; ^
+    (New-Object System.Net.WebClient).DownloadFile($url, $dest); ^
+    Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Completado' -PercentComplete 100; ^
+}"
 
-echo Instalando...
+:: Verificacion de seguridad (evitar archivos de 14 bytes/error 404)
+for %%I in ("%EXE_NAME%.new") do set FILESIZE=%%~zI
+if !FILESIZE! LSS 1000 (
+    echo [ERROR] Archivo corrupto o no encontrado en GitHub.
+    del "%EXE_NAME%.new"
+    pause
+    start "" "%EXE_NAME%" /noupdate
+    popd
+    exit
+)
+
+echo Instalando archivos...
+curl -s -L %URL_VERSION% -o version.txt
 move /y "%EXE_NAME%.new" "%EXE_NAME%"
+
+:: Quitar bloqueo de seguridad de Windows al archivo descargado
+powershell -Command "Unblock-File -Path '%EXE_NAME%'"
 
 echo Hecho. Reiniciando...
 del version_remota.txt
 start "" "%EXE_NAME%" /noupdate
 
-:: 7. Liberar ruta de red y salir
 popd
 exit
