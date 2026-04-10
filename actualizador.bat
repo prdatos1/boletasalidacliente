@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: 1. Entrar en la carpeta del script (soporta rutas de red UNC)
+:: 1. Soporte para rutas de red (UNC)
 pushd "%~dp0"
 
 :: --- CONFIGURACION ---
@@ -42,16 +42,18 @@ echo.
 taskkill /f /im "%EXE_NAME%" > nul 2>&1
 
 echo Abriendo asistente de descarga...
-:: Descarga con barra de progreso grafica de Windows (PowerShell)
-powershell -Command "& { ^
-    $url = '%URL_EXE%'; ^
-    $dest = '%EXE_NAME%.new'; ^
-    Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Descargando nuevo ejecutable...' -PercentComplete 0; ^
-    (New-Object System.Net.WebClient).DownloadFile($url, $dest); ^
-    Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Completado' -PercentComplete 100; ^
-}"
+:: Descarga con barra grafica (Comando en una linea para evitar errores de sintaxis)
+powershell -Command "$url='%URL_EXE%'; $dest='%EXE_NAME%.new'; Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Descargando nuevo ejecutable...' -PercentComplete 0; (New-Object System.Net.WebClient).DownloadFile($url, $dest); Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Completado' -PercentComplete 100;"
 
-:: Verificacion de seguridad (evitar archivos de 14 bytes/error 404)
+:: Verificacion de seguridad
+if not exist "%EXE_NAME%.new" (
+    echo [ERROR] No se pudo descargar el archivo.
+    pause
+    start "" "%EXE_NAME%" /noupdate
+    popd
+    exit
+)
+
 for %%I in ("%EXE_NAME%.new") do set FILESIZE=%%~zI
 if !FILESIZE! LSS 1000 (
     echo [ERROR] Archivo corrupto o no encontrado en GitHub.
@@ -66,11 +68,15 @@ echo Instalando archivos...
 curl -s -L %URL_VERSION% -o version.txt
 move /y "%EXE_NAME%.new" "%EXE_NAME%"
 
-:: Quitar bloqueo de seguridad de Windows al archivo descargado
+:: Quitar bloqueo de seguridad de Windows
 powershell -Command "Unblock-File -Path '%EXE_NAME%'"
 
-echo Hecho. Reiniciando...
+echo.
+echo Actualizacion completada con exito.
 del version_remota.txt
+timeout /t 2 > nul
+
+:: Reiniciar
 start "" "%EXE_NAME%" /noupdate
 
 popd
