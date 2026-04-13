@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: 1. Entrar en la carpeta del script (soporta rutas de red UNC)
+:: 1. Entrar en la carpeta del script (Soporte UNC para red)
 pushd "%~dp0"
 
 :: --- CONFIGURACION ---
@@ -14,13 +14,10 @@ title Buscador de Actualizaciones GS1
 echo Comprobando version en GitHub...
 curl -s -L %URL_VERSION% -o version_remota.txt
 
-:: Si no existe version.txt local, creamos uno base
 if not exist version.txt echo 0.0.0 > version.txt
-
 set /p LOCAL_V=<version.txt
 set /p REMOTE_V=<version_remota.txt
 
-:: Limpiar espacios
 set LOCAL_V=%LOCAL_V: =%
 set REMOTE_V=%REMOTE_V: =%
 
@@ -31,7 +28,6 @@ if "%LOCAL_V%"=="%REMOTE_V%" (
     echo Programa actualizado.
     del version_remota.txt
     timeout /t 1 > nul
-    :: Si ya esta actualizado, abrimos el programa y salimos
     start "" "%EXE_NAME%" /noupdate
     popd
     exit
@@ -41,48 +37,54 @@ echo.
 echo ! NUEVA VERSION DETECTADA !
 echo.
 
-:: Matamos el proceso para asegurar que el archivo no este bloqueado
+:: Matar el proceso y esperar un segundo extra
 taskkill /f /im "%EXE_NAME%" > nul 2>&1
-timeout /t 1 /nobreak > nul
+timeout /t 2 /nobreak > nul
 
-echo Abriendo asistente de descarga...
-:: Descarga con barra grafica grafica de Windows (PowerShell)
-powershell -Command "$url='%URL_EXE%'; $dest='%EXE_NAME%.new'; Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Descargando nuevo ejecutable...' -PercentComplete 0; (New-Object System.Net.WebClient).DownloadFile($url, $dest); Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Completado' -PercentComplete 100;"
+echo Descargando nueva version...
+powershell -Command "$url='%URL_EXE%'; $dest='%EXE_NAME%.new'; (New-Object System.Net.WebClient).DownloadFile($url, $dest);"
 
-:: Verificacion de seguridad (evitar archivos corruptos)
+:: Verificacion de descarga exitosa
 if not exist "%EXE_NAME%.new" (
-    echo [ERROR] No se pudo descargar el archivo.
+    echo [ERROR] No se pudo descargar el archivo de GitHub.
     pause
     popd
     exit
 )
 
-for %%I in ("%EXE_NAME%.new") do set FILESIZE=%%~zI
-if !FILESIZE! LSS 1000 (
-    echo [ERROR] Archivo corrupto o no encontrado en GitHub.
-    del "%EXE_NAME%.new"
+:: --- BUCLE DE REEMPLAZO SEGURO ---
+echo Intentando sustituir el archivo...
+
+:intentar_borrar
+del /f /q "%EXE_NAME%" > nul 2>&1
+if exist "%EXE_NAME%" (
+    echo El archivo todavia esta en uso. Reintentando en 1 segundo...
+    timeout /t 1 /nobreak > nul
+    goto intentar_borrar
+)
+
+copy /y "%EXE_NAME%.new" "%EXE_NAME%" > nul
+if errorlevel 1 (
+    echo [ERROR] No se pudo copiar el nuevo archivo. Comprueba los permisos de la carpeta.
     pause
     popd
     exit
 )
 
-echo Instalando archivos...
-:: Primero actualizamos el txt de version
+:: Actualizar version.txt local
 curl -s -L %URL_VERSION% -o version.txt
-:: Sustituimos el EXE
-move /y "%EXE_NAME%.new" "%EXE_NAME%"
 
-:: Quitar bloqueo de seguridad de Windows al archivo nuevo
+:: Limpieza y desbloqueo
+del "%EXE_NAME%.new"
+del version_remota.txt
 powershell -Command "Unblock-File -Path '%EXE_NAME%'"
 
 echo.
 echo ==================================================
-echo   ACTUALIZACION COMPLETADA
-echo   Por favor, abre el programa manualmente ahora.
+echo   ACTUALIZACION COMPLETADA CON EXITO
+echo   Version instalada: v%REMOTE_V%
 echo ==================================================
 echo.
-
-del version_remota.txt
 timeout /t 3
 popd
 exit
