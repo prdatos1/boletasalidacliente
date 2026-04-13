@@ -9,82 +9,84 @@ set "EXE_NAME=GS1-BARTENDER.exe"
 set "URL_VERSION=https://raw.githubusercontent.com/prdatos1/boletasalidacliente/main/version.txt"
 set "URL_EXE=https://raw.githubusercontent.com/prdatos1/boletasalidacliente/main/GS1-BARTENDER.exe"
 
-title Buscador de Actualizaciones GS1
+title Actualizador GS1 - Forzando reemplazo
 
-echo Comprobando version en GitHub...
-curl -s -L %URL_VERSION% -o version_remota.txt
+echo Verificando versiones...
+curl -s -L %URL_VERSION% -o version_github.txt
 
 if not exist version.txt echo 0.0.0 > version.txt
 set /p LOCAL_V=<version.txt
-set /p REMOTE_V=<version_remota.txt
+set /p REMOTE_V=<version_github.txt
 
+:: Limpiar caracteres extraños
 set LOCAL_V=%LOCAL_V: =%
 set REMOTE_V=%REMOTE_V: =%
 
-echo Version Local: [%LOCAL_V%]
-echo Version GitHub: [%REMOTE_V%]
+echo Local:  [%LOCAL_V%]
+echo GitHub: [%REMOTE_V%]
 
 if "%LOCAL_V%"=="%REMOTE_V%" (
-    echo Programa actualizado.
-    del version_remota.txt
-    timeout /t 1 > nul
+    echo No hay cambios.
+    del version_github.txt
     start "" "%EXE_NAME%" /noupdate
     popd
     exit
 )
 
 echo.
-echo ! NUEVA VERSION DETECTADA !
+echo === INICIANDO ACTUALIZACION ===
 echo.
 
-:: Matar el proceso y esperar un segundo extra
+:: 2. Matar el proceso y esperar a que Windows lo suelte
 taskkill /f /im "%EXE_NAME%" > nul 2>&1
 timeout /t 2 /nobreak > nul
 
-echo Descargando nueva version...
-powershell -Command "$url='%URL_EXE%'; $dest='%EXE_NAME%.new'; (New-Object System.Net.WebClient).DownloadFile($url, $dest);"
+:: 3. Descargar el nuevo EXE con un nombre temporal
+echo Descargando archivo nuevo...
+curl -L %URL_EXE% -o "GS1_NUEVO.tmp"
 
-:: Verificacion de descarga exitosa
-if not exist "%EXE_NAME%.new" (
+if not exist "GS1_NUEVO.tmp" (
     echo [ERROR] No se pudo descargar el archivo de GitHub.
     pause
+    start "" "%EXE_NAME%" /noupdate
     popd
     exit
 )
 
-:: --- BUCLE DE REEMPLAZO SEGURO ---
-echo Intentando sustituir el archivo...
-
-:intentar_borrar
+:: 4. ELIMINAR EL ANTIGUO (Paso critico)
+echo Eliminando version antigua...
+:retry_del
 del /f /q "%EXE_NAME%" > nul 2>&1
 if exist "%EXE_NAME%" (
-    echo El archivo todavia esta en uso. Reintentando en 1 segundo...
-    timeout /t 1 /nobreak > nul
-    goto intentar_borrar
+    echo El archivo sigue bloqueado. Reintentando...
+    timeout /t 1 > nul
+    goto retry_del
 )
 
-copy /y "%EXE_NAME%.new" "%EXE_NAME%" > nul
-if errorlevel 1 (
-    echo [ERROR] No se pudo copiar el nuevo archivo. Comprueba los permisos de la carpeta.
+:: 5. RENOMBRAR EL NUEVO
+echo Instalando nueva version...
+ren "GS1_NUEVO.tmp" "%EXE_NAME%"
+
+if not exist "%EXE_NAME%" (
+    echo [ERROR] No se pudo renombrar el archivo.
     pause
     popd
     exit
 )
 
-:: Actualizar version.txt local
-curl -s -L %URL_VERSION% -o version.txt
+:: 6. Actualizar version.txt local
+copy /y version_github.txt version.txt > nul
 
-:: Limpieza y desbloqueo
-del "%EXE_NAME%.new"
-del version_remota.txt
+:: 7. Desbloquear seguridad de Windows
 powershell -Command "Unblock-File -Path '%EXE_NAME%'"
 
 echo.
-echo ==================================================
-echo   ACTUALIZACION COMPLETADA CON EXITO
-echo   Version instalada: v%REMOTE_V%
-echo ==================================================
+echo ========================================
+echo   ACTUALIZADO A v%REMOTE_V%
+echo ========================================
 echo.
+
+del version_github.txt
 timeout /t 3
 popd
 exit
