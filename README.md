@@ -1,61 +1,53 @@
 # Sistema de Actualización Automática - Boleta Salida Cliente
 
-Este repositorio contiene los archivos necesarios para el sistema de actualización automática de la aplicación principal `GS1-BARTENDER.exe`. El sistema utiliza una arquitectura de **Lanzador/Actualizador** (`ActualizadorGS.exe`) separada de la aplicación principal para garantizar una actualización robusta, segura y sin bloqueos de archivos de Windows.
+Este repositorio contiene los archivos necesarios para el sistema de actualización automática de la aplicación principal `GS1-BARTENDER.exe`. El sistema utiliza una arquitectura de **Lanzador/Actualizador** (`ActualizadorGS.exe`) separada de la aplicación principal para garantizar una actualización robusta y sin errores.
 
-## 📁 Estructura del Proyecto (Entorno Local del Cliente)
+## 📋 Requisitos Previos
 
-Para que el sistema funcione correctamente, el usuario final debe tener una carpeta local con los siguientes tres archivos mínimos (tal como se muestra en la imagen de referencia):
+Para que la aplicación funcione correctamente, el ordenador debe tener instalado:
+* **BarTender 2021 Professional** (o superior).
+* **BarTender SDK** (incluido habitualmente en la instalación completa de BarTender). Sin el SDK, la aplicación no podrá comunicarse con el motor de impresión.
 
-![Estructura Local](https://raw.githubusercontent.com/prdatos1/boletasalidacliente/main/version.txt?dummy=structure_img_placeholder)
-*(Nota: Reemplaza esta URL con la URL real de tu imagen de estructura si la subes al repo, o simplemente usa la lista de abajo)*
+## ⚙️ Instalación y Configuración Inicial
 
-* **`ActualizadorGS.exe`**: El **Lanzador y Actualizador**. Este es el punto de entrada para el usuario. Comprueba actualizaciones, las descarga e instala si es necesario, y luego abre la aplicación principal.
-* **`GS1-BARTENDER.exe`**: La **Aplicación Principal**. Esta es tu aplicación de negocio que imprime las etiquetas. No debe ser ejecutada directamente por el usuario.
-* **`version.txt`**: Un archivo de texto plano local que guarda el número de la versión instalada actualmente (ej: `1.0.0`).
+Para instalar la aplicación por primera vez en un equipo, siga estos pasos:
+
+1.  **Crear Carpeta:** Cree una carpeta en la ubicación que desee de su ordenador (ej: `C:\GS1-BarTender` o en una unidad de red).
+2.  **Descargar Archivos:** Copie dentro de esa carpeta los archivos descargados de este repositorio de GitHub:
+    * `ActualizadorGS.exe`
+    * `GS1-BARTENDER.exe`
+    * `version.txt`
+3.  **Acceso Directo:** Haga clic derecho sobre **`ActualizadorGS.exe`** -> *Enviar a* -> *Escritorio (crear acceso directo)*.
 
 ## 🚀 Instrucciones de Ejecución para el Usuario Final
 
-**IMPORTANTE:** Los usuarios finales **SIEMPRE** deben iniciar la aplicación haciendo doble clic en **`ActualizadorGS.exe`**.
+**⚠️ AVISO IMPORTANTE:**
+El usuario debe iniciar el programa **SIEMPRE** a través del acceso directo del **`ActualizadorGS.exe`** que se ha creado en el escritorio.
 
-**NO** deben ejecutar `GS1-BARTENDER.exe` directamente. Si lo hacen, no se comprobarán las actualizaciones y podrían estar trabajando con una versión obsoleta.
+* **¿Por qué?** Porque este archivo es el que se encarga de conectar con GitHub, verificar si hay una versión nueva y descargarla antes de abrir el programa principal.
+* **Nunca** ejecute directamente el archivo `GS1-BARTENDER.exe`, ya que omitirá la comprobación de actualizaciones y podría trabajar con datos o formatos desactualizados.
 
-## 🛠️ Proceso de Actualización: Flujo de Trabajo del Desarrollador
+## 🛠️ Proceso de Actualización (Flujo del Desarrollador)
 
-Cada vez que hayas realizado cambios en el código de tu aplicación principal (`GS1-BARTENDER`) y quieras distribuir una nueva versión, debes seguir estos pasos exactos para que el actualizador de los clientes pueda descargarla automáticamente:
+Para publicar una nueva versión y que se distribuya automáticamente a todos los usuarios:
 
-### Paso 1: Generar la Nueva Versión
-1.  Realiza tus cambios en Visual Studio en el proyecto `GS1-BARTENDER`.
-2.  **Compila** el proyecto en modo `Release` para generar el nuevo archivo ejecutable (.exe).
-3.  Busca el archivo `GS1-BARTENDER.exe` recién compilado en tu carpeta de salida (ej: `bin/Release`).
-
-### Paso 2: Definir el Nuevo Número de Versión
-1.  Decide el nuevo número de versión (ej: si la actual es `1.0.0`, la nueva podría ser `1.0.1` o `1.1.0`).
-2.  Crea o modifica un archivo `version.txt` local en tu PC y escribe **únicamente** el nuevo número de versión dentro. Ejemplo de contenido del archivo: `1.0.1`
-
-### Paso 3: Actualizar el Repositorio de GitHub
-Debes subir a la rama `main` de este repositorio (`prdatos1/boletasalidacliente`) los siguientes archivos:
-
-1.  El nuevo archivo **`GS1-BARTENDER.exe`** que compilaste en el Paso 1.
-2.  El archivo **`version.txt`** actualizado que creaste en el Paso 2.
-
-*Es vital que subas ambos archivos. Si subes el exe pero no actualizas el version.txt en GitHub, el actualizador de los clientes no sabrá que hay una versión nueva.*
+1.  **Compilar:** Compile el proyecto `GS1-BARTENDER` en Visual Studio para obtener el nuevo `.exe`.
+2.  **Número de Versión:** Actualice su archivo `version.txt` local con el nuevo número (ej: `1.0.5`).
+3.  **Subir a GitHub:** Suba tanto el nuevo **`GS1-BARTENDER.exe`** como el nuevo **`version.txt`** a la rama `main` de este repositorio.
 
 ---
 
-## 🔍 ¿Cómo funciona el Actualizador (`ActualizadorGS.exe`)?
+## 🔍 Lógica del Sistema (`ActualizadorGS.exe`)
 
-Para tu conocimiento, este es el proceso lógico que sigue el lanzador cuando un usuario lo abre:
+Cuando el usuario abre el actualizador, el programa realiza lo siguiente:
 
-1.  **Lectura Local:** Lee el archivo `version.txt` local para saber qué versión tiene instalada el usuario.
-2.  **Consulta a GitHub:** Descarga y lee el archivo `version.txt` de este repositorio de GitHub.
-3.  **Comparación:** Compara ambos números de versión.
-    * **Si son iguales:** Muestra un mensaje "Programa al día" y abre directamente `GS1-BARTENDER.exe`.
-    * **Si son diferentes (GitHub es más reciente):**
-        * Muestra una interfaz visual con una barra de progreso.
-        * Descarga el nuevo `GS1-BARTENDER.exe` de GitHub como un archivo temporal.
-        * Reemplaza el `GS1-BARTENDER.exe` local antiguo con el nuevo descargado. *Debido a que el Bartender estaba cerrado, este reemplazo nunca falla.*
-        * Actualiza el archivo `version.txt` local del usuario con el nuevo número de versión.
-        * Ejecuta la nueva versión de `GS1-BARTENDER.exe` y cierra el actualizador.
+1.  **Comprobación:** Compara el número del `version.txt` local con el de este repositorio de GitHub.
+2.  **Actualización:** Si en GitHub hay una versión superior:
+    * Muestra una barra de progreso.
+    * Descarga el nuevo ejecutable.
+    * Sustituye el archivo antiguo (esto nunca falla porque el programa principal está cerrado en ese momento).
+    * Actualiza el `version.txt` local.
+3.  **Ejecución:** Una vez asegurada la última versión, lanza automáticamente `GS1-BARTENDER.exe` y el actualizador se cierra solo.
 
 ---
-*Este sistema de actualización ha sido diseñado para solucionar problemas de archivos bloqueados por Windows y para proporcionar una experiencia de usuario limpia y profesional.*
+*Desarrollado para garantizar que todos los puestos de trabajo utilicen siempre la versión más reciente del sistema de etiquetado.*
