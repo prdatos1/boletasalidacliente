@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: 1. Soporte para rutas de red (UNC)
+:: 1. Entrar en la carpeta del script (soporta rutas de red UNC)
 pushd "%~dp0"
 
 :: --- CONFIGURACION ---
@@ -28,9 +28,10 @@ echo Version Local: [%LOCAL_V%]
 echo Version GitHub: [%REMOTE_V%]
 
 if "%LOCAL_V%"=="%REMOTE_V%" (
-    echo Programa actualizado. Iniciando...
-    timeout /t 1 > nul
+    echo Programa actualizado.
     del version_remota.txt
+    timeout /t 1 > nul
+    :: Si ya esta actualizado, abrimos el programa y salimos
     start "" "%EXE_NAME%" /noupdate
     popd
     exit
@@ -39,17 +40,19 @@ if "%LOCAL_V%"=="%REMOTE_V%" (
 echo.
 echo ! NUEVA VERSION DETECTADA !
 echo.
+
+:: Matamos el proceso para asegurar que el archivo no este bloqueado
 taskkill /f /im "%EXE_NAME%" > nul 2>&1
+timeout /t 1 /nobreak > nul
 
 echo Abriendo asistente de descarga...
-:: Descarga con barra grafica (Comando en una linea para evitar errores de sintaxis)
+:: Descarga con barra grafica grafica de Windows (PowerShell)
 powershell -Command "$url='%URL_EXE%'; $dest='%EXE_NAME%.new'; Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Descargando nuevo ejecutable...' -PercentComplete 0; (New-Object System.Net.WebClient).DownloadFile($url, $dest); Write-Progress -Activity 'Actualizando GS1 BarTender' -Status 'Completado' -PercentComplete 100;"
 
-:: Verificacion de seguridad
+:: Verificacion de seguridad (evitar archivos corruptos)
 if not exist "%EXE_NAME%.new" (
     echo [ERROR] No se pudo descargar el archivo.
     pause
-    start "" "%EXE_NAME%" /noupdate
     popd
     exit
 )
@@ -59,25 +62,27 @@ if !FILESIZE! LSS 1000 (
     echo [ERROR] Archivo corrupto o no encontrado en GitHub.
     del "%EXE_NAME%.new"
     pause
-    start "" "%EXE_NAME%" /noupdate
     popd
     exit
 )
 
 echo Instalando archivos...
+:: Primero actualizamos el txt de version
 curl -s -L %URL_VERSION% -o version.txt
+:: Sustituimos el EXE
 move /y "%EXE_NAME%.new" "%EXE_NAME%"
 
-:: Quitar bloqueo de seguridad de Windows
+:: Quitar bloqueo de seguridad de Windows al archivo nuevo
 powershell -Command "Unblock-File -Path '%EXE_NAME%'"
 
 echo.
-echo Actualizacion completada con exito.
+echo ==================================================
+echo   ACTUALIZACION COMPLETADA
+echo   Por favor, abre el programa manualmente ahora.
+echo ==================================================
+echo.
+
 del version_remota.txt
-timeout /t 2 > nul
-
-:: Reiniciar
-start "" "%EXE_NAME%" /noupdate
-
+timeout /t 3
 popd
 exit
